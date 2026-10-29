@@ -31,9 +31,13 @@ async function callProvider(prompt: string, cfg: LlmConfig): Promise<string> {
       return r.text ?? "";
     } catch (e: any) {
       const status = Number(e?.status ?? e?.code ?? 0);
+      // Show the provider's own reason (with the key scrubbed out) so a wrong model or key is easy to spot.
+      const why = String(e?.message ?? "").split(cfg.key).join("***").replace(/\s+/g, " ").slice(0, 300);
+      console.error(`Gemini error ${status || ""}: ${why}`);
       if (status === 429) throw new ApiError(429, "RATE_LIMITED", "The AI provider says too many requests. Wait a minute or switch model.");
-      if (status === 400 || status === 401 || status === 403) throw new ApiError(401, "BAD_KEY", "The provider rejected this key or model. Check Settings.");
-      throw new ApiError(502, "PROVIDER_ERROR", "The AI provider failed. Try again.");
+      if (status === 404) throw new ApiError(400, "BAD_MODEL", `Gemini has no model "${cfg.model}". Copy an exact Flash model id from AI Studio into Settings.`);
+      if (status === 400 || status === 401 || status === 403) throw new ApiError(401, "BAD_KEY", `Gemini rejected the key or model: ${why}`);
+      throw new ApiError(502, "PROVIDER_ERROR", `The AI provider failed: ${why || "no details"}`);
     }
   }
   if (cfg.provider === "anthropic") {
