@@ -235,7 +235,8 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
       if (!MAP_COLUMNS.includes(col)) continue;
       let level = Math.max(0, Math.min(3, Math.round(raw)));
       level = Math.min(level, bloomCeiling(col, c.bloom));
-      if (col === "PO-5" && !(coverage[c.id] ?? []).some(isPracticalOrAssignment) && !units.some((u) => u.lab)) level = 0;
+      // PO-5 needs real tool use for this CO: it must be assessed in a lab, practical or assignment component.
+      if (col === "PO-5" && !(coverage[c.id] ?? []).some(isPracticalOrAssignment)) level = 0;
       if (col === "PO-5" && level >= 2 && !(coverage[c.id] ?? []).some(isPracticalOrAssignment)) level = 1;
       if (level >= 1) row[col] = { level: level as 1 | 2 | 3, justification: aiCells.get(col)?.why || `${c.id} (${REF.blooms.find((b) => b.level === `L${c.bloom}`)?.name ?? "Bloom's L" + c.bloom}) contributes to ${col} through the course's syllabus and assessment.` };
     }
