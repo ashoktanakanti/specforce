@@ -111,10 +111,18 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
     if (line && line !== h) add("TYPO_OR_FORMAT", "spec", i + 1, [], `Section heading "${line}" should read "${h}".`, `Used the template heading "${h}".`);
   });
 
+  // Which template section a piece of spec text sits in: the last section heading above its first appearance.
+  const headingAt = templateHeadings(model.template).map((h, i) => ({ n: i + 1, at: specLines.findIndex((l) => normText(l).startsWith(normText(h))) })).filter((h) => h.at >= 0);
+  const sectionOf = (text: string): number | null => {
+    const at = specLines.findIndex((l) => normText(l).includes(normText(text)));
+    if (at < 0 || !normText(text)) return null;
+    return headingAt.filter((h) => h.at <= at).sort((p, q) => q.at - p.at)[0]?.n ?? null;
+  };
+
   // Typos and broken references the AI corrected while reading (skipping any already reported above).
   const reported = (o: string) => out.some((d) => d.code === "TYPO_OR_FORMAT" && normText(d.description).includes(normText(o)));
   for (const t of spec.typos) if (t.original && t.corrected && t.original !== t.corrected && !reported(t.original))
-    add("TYPO_OR_FORMAT", "spec", t.section && t.section <= 12 ? t.section : 9, [], `"${t.original}" should read "${t.corrected}".`, `Corrected to "${t.corrected}".`);
+    add("TYPO_OR_FORMAT", "spec", sectionOf(t.original) ?? (t.section && t.section <= 12 ? t.section : 9), [], `"${t.original}" should read "${t.corrected}".`, `Corrected to "${t.corrected}".`);
 
   // Sections that the template has no place for.
   for (const s of spec.extra_sections) add("SECTION_NOT_IN_TEMPLATE", "spec", s.number && s.number <= 12 ? s.number : null, [], `Section "${s.heading}" is not part of the official template.`, "Left it out of the document and reported it here.");
