@@ -169,7 +169,7 @@ export function runChecks(m: SpecModel): Check[] {
     { id: "V2", rule: "Every CO maps to at least one PO", pass: ids.every((i) => Object.keys(m.map[i] ?? {}).some((c) => c.startsWith("PO-"))), detail: ids.filter((i) => !Object.keys(m.map[i] ?? {}).some((c) => c.startsWith("PO-"))).join(", ") || "all mapped" },
     { id: "V3", rule: "Every CO is assessed in at least one component", pass: ids.every((i) => (m.assessment.coverage[i] ?? []).length > 0), detail: ids.filter((i) => !(m.assessment.coverage[i] ?? []).length).join(", ") || "all assessed" },
     { id: "V4", rule: "No undefined CO appears in any table", pass: extraIds.length === 0, detail: extraIds.join(", ") || "none" },
-    { id: "V5", rule: "Teaching hours add up to the total", pass: th.total === m.teaching.groups.reduce((a, g) => a + g.hours, 0) && th.total > 0, detail: `${th.lectures} lectures + ${th.lab} lab + ${th.tests_exams} tests/exams, total ${th.total}` },
+    { id: "V5", rule: "Teaching hours add up to the total", pass: th.total + th.tests_exams === m.teaching.groups.reduce((a, g) => a + g.hours, 0) && th.total > 0, detail: `${th.lectures} lectures + ${th.lab} lab + ${th.tests_exams} tests/exams, total ${th.total}` },
     { id: "V6", rule: "Assessment weightages total 100%", pass: Math.abs(weight - 100) < 0.5, detail: `${Math.round(weight * 100) / 100}%` },
     { id: "V7", rule: "No template sample text remains", pass: left.length === 0, detail: left.slice(0, 3).join(" | ") || "clean" },
     { id: "V8", rule: `PSO columns match the programme (${PSO_IDS.join(", ")})`, pass: allCells.every((c) => !c.col.startsWith("PSO") || PSO_IDS.includes(c.col)), detail: PSO_IDS.join(", ") },
