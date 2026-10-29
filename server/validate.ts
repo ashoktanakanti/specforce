@@ -79,6 +79,10 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
   }
   const sum = spec.teaching.groups.reduce((a, g) => a + g.hours, 0);
   if (spec.teaching.stated_total != null && sum && spec.teaching.stated_total !== sum) add("HOURS_INCONSISTENT", "spec", 6, [], `Teaching hours add up to ${sum}, but the stated total is ${spec.teaching.stated_total}.`, `Recomputed the total as ${sum}.`);
+  // Section 2 states total interaction hours; the teaching table must agree with it.
+  const interaction = spec.credits.find((c) => /interaction/i.test(c.label));
+  const interactionHours = interaction ? Number(String(interaction.value).replace(/[^\d.]/g, "")) : 0;
+  if (interactionHours && sum && interactionHours !== sum) add("HOURS_INCONSISTENT", "spec", 2, [], `Total Hours of Interaction is ${interactionHours} in the credits table, but teaching and learning hours add up to ${sum}.`, "Reported for correction; teaching hours are kept as listed.");
 
   // Template choice and signals.
   const ptype = /laborator|\blab\b|practical/i.test(spec.course_type), pcred = Number(model.ltp.split(":")[2]) > 0;
