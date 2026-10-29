@@ -165,7 +165,8 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
 
   const model: SpecModel = {
     inputId, template, templateDetected: template, templateSignals: signals, templateOverrideReason: "", hasBlueprint: useBp,
-    header: { title: spec.title || bp?.title || "", code: spec.code || bp?.code || "", course_type: spec.course_type, department: spec.department, faculty: spec.faculty },
+    // Title and code must match the blueprint, so it wins when present; otherwise the spec's own header.
+    header: { title: (useBp && bp!.title) || spec.title, code: (useBp && bp!.code) || spec.code, course_type: spec.course_type, department: spec.department, faculty: spec.faculty },
     summary: spec.summary,
     credits: spec.credits, ltp, cos, units,
     map: {},

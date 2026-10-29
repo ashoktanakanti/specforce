@@ -23,8 +23,8 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
       else if (normText(specCos.get(c.id)!) !== normText(c.statement)) add("LABEL_OR_TITLE_MISMATCH", "spec", 3, [c.id], `${c.id} wording differs between the spec and the blueprint.`, "Used the blueprint wording.");
     }
     for (const id of specCos.keys()) if (!bp.cos.some((c) => c.id === id)) add("CO_EXTRA_IN_TABLE", "spec", 3, [id], `${id} is in the spec but not in the blueprint.`, `Removed ${id}; the blueprint decides the COs.`);
-    if (bp.code && spec.code && normText(bp.code) !== normText(spec.code)) add("LABEL_OR_TITLE_MISMATCH", "spec", null, [], `Course code "${spec.code}" in the spec differs from "${bp.code}" in the blueprint.`, "Flagged for the Author; kept the spec header.");
-    if (bp.title && spec.title && normText(bp.title) !== normText(spec.title)) add("LABEL_OR_TITLE_MISMATCH", "spec", null, [], `Course title differs between the spec and the blueprint.`, "Flagged for the Author; kept the spec header.");
+    if (bp.code && spec.code && normText(bp.code) !== normText(spec.code)) add("LABEL_OR_TITLE_MISMATCH", "spec", null, [], `Course code "${spec.code}" in the spec differs from "${bp.code}" in the blueprint.`, `Used the blueprint code "${bp.code}".`);
+    if (bp.title && spec.title && normText(bp.title) !== normText(spec.title)) add("LABEL_OR_TITLE_MISMATCH", "spec", null, [], `Course title "${spec.title}" in the spec differs from "${bp.title}" in the blueprint.`, `Used the blueprint title "${bp.title}".`);
     for (const u of bp.units) {
       const s = spec.units.find((v) => v.number === u.number);
       if (!s) add("LABEL_OR_TITLE_MISMATCH", "spec", 4, [`Unit-${u.number}`], `Unit ${u.number} of the blueprint is missing from the spec.`, "Used the blueprint units.");

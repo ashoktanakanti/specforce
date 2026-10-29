@@ -196,3 +196,7 @@ label { display: grid; gap: 4px; font-size: .9rem; }
   .top { flex-wrap: wrap; } .brand small { display: none; }
 }
 @media (max-width: 540px) { .drops, .how, .flow { grid-template-columns: 1fr; } }
+
+.rename { display: grid; grid-template-columns: 140px 1fr auto auto; gap: 8px; margin: 0 0 12px; }
+.spechead h1 .rn { font: 500 13px var(--sans); margin-left: 12px; vertical-align: middle; }
+@media (max-width: 640px) { .rename { grid-template-columns: 1fr; } }

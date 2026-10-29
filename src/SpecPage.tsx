@@ -34,6 +34,8 @@ export default function SpecPage({ spec, role, onChange }: { spec: SpecView; rol
   const [section, setSection] = useState(SECTIONS[0]);
   const [picked, setPicked] = useState<{ co: string; col: string } | null>(null);
   const [summary, setSummary] = useState(spec.model.summary);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState({ title: "", code: "" });
   const m = spec.model;
   const canEdit = role === "Author" && (spec.status === "Draft" || spec.status === "Returned");
   const cols = ref ? [...ref.pos.map((p) => p.id), ...ref.psos.map((p) => p.id)] : [];
@@ -70,7 +72,14 @@ export default function SpecPage({ spec, role, onChange }: { spec: SpecView; rol
       <header className="spechead">
         <div>
           <p className="eyebrow">{m.header.code} · {m.header.department}</p>
-          <h1>{m.header.title}</h1>
+          {renaming ? (
+            <form className="rename" onSubmit={(e) => { e.preventDefault(); run("", { header: { title: name.title, code: name.code } }, "PATCH").then((ok) => ok && setRenaming(false)); }}>
+              <input aria-label="Course code" value={name.code} onChange={(e) => setName({ ...name, code: e.target.value })} />
+              <input aria-label="Course name" value={name.title} onChange={(e) => setName({ ...name, title: e.target.value })} />
+              <button className="primary" disabled={busy || !name.title.trim() || !name.code.trim()}>Save</button>
+              <button type="button" className="ghost" onClick={() => setRenaming(false)}>Cancel</button>
+            </form>
+          ) : <h1>{m.header.title}{canEdit && <button className="link rn" onClick={() => { setName({ title: m.header.title, code: m.header.code }); setRenaming(true); }}>rename</button>}</h1>}
           <p className="meta">
             <span className="chip">L:T:P {m.ltp}</span>
             <span className={`chip tpl ${m.template}`}>{m.template === "integrated" ? "Integrated (theory + lab)" : "Non-Lab"}</span>

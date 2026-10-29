@@ -73,6 +73,7 @@ api.get("/specs/:id/spec.html", (req, res) => {
 const Level = z.union([z.literal(1), z.literal(2), z.literal(3), z.null()]);
 const Patch = z.object({
   summary: z.string().optional(),
+  header: z.object({ title: z.string().trim().min(1).optional(), code: z.string().trim().min(1).optional() }).optional(),
   cos: z.array(z.object({ id: z.string(), statement: z.string().optional(), plain: z.string().optional(), bloom: z.number().int().min(1).max(6).optional() })).optional(),
   units: z.array(z.object({ number: z.number(), title: z.string().optional(), content: z.string().optional(), lab: z.string().nullable().optional() })).optional(),
   map: z.record(z.record(z.union([Level, z.object({ level: Level, justification: z.string() })]))).optional(),
@@ -88,6 +89,8 @@ api.patch("/specs/:id", (req, res) => {
   if (!p.success) throw new ApiError(400, "BAD_INPUT", p.error.issues[0]?.message ?? "Invalid edit.");
   const m: SpecModel = r.model, b = p.data;
   if (b.summary !== undefined) m.summary = b.summary;
+  if (b.header?.title) m.header.title = b.header.title;
+  if (b.header?.code) m.header.code = b.header.code;
   for (const c of b.cos ?? []) { const t = m.cos.find((x) => x.id === c.id); if (t) Object.assign(t, { ...c, id: t.id }); }
   for (const u of b.units ?? []) { const t = m.units.find((x) => x.number === u.number); if (t) Object.assign(t, { ...u, number: t.number }); }
   for (const [co, row] of Object.entries(b.map ?? {})) {
