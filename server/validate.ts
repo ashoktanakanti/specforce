@@ -67,6 +67,16 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
     if (!row) add("CO_MISSING_IN_TABLE", "spec", 7, [id], `${id} has no row in the assessment table.`, `Flagged: ${id} must be assigned to an assessment component.`);
     else if (!row.comps.length) add("CO_ASSESSMENT_MISMATCH", "spec", 7, [id], `${id} is not assessed in any component.`, `Flagged: ${id} must be assigned to an assessment component.`);
   }
+  // Components that carry marks but assess no defined CO (e.g. only an undefined CO was marked against them).
+  const usedBy = (name: string) => assessed.some((r) => finalSet.has(r.co) && r.comps.some((c) => normText(c) === normText(name)));
+  const idle = model.assessment.columns.filter((c) => c.weight_percent > 0 && !usedBy(c.name));
+  if (idle.length && assessed.length) {
+    const share = Math.round(idle.reduce((a, c) => a + c.weight_percent, 0) * 100) / 100;
+    const onlyUndefined = assessed.filter((r) => !finalSet.has(r.co) && r.comps.some((c) => idle.some((i) => normText(i.name) === normText(c)))).map((r) => r.co);
+    add("CO_ASSESSMENT_MISMATCH", "spec", 7, [...idle.map((c) => c.name), ...onlyUndefined],
+      `${idle.map((c) => `"${c.name}"`).join(" and ")} carr${idle.length > 1 ? "y" : "ies"} ${share}% of the marks but assess no defined Course Outcome${onlyUndefined.length ? ` (only ${onlyUndefined.join(", ")} was marked against ${idle.length > 1 ? "them" : "it"})` : ""}.`,
+      "Flagged for the Course Leader to assign Course Outcomes to these components.");
+  }
   if (spec.assessment.groups.length) {
     const w = spec.assessment.groups.reduce((a, g) => a + g.weight_percent, 0);
     if (Math.abs(w - 100) > 0.01) add("WEIGHTAGE_INCONSISTENT", "spec", 7, [], `Assessment weightages add up to ${w}%, not 100%.`, "Reported for correction.");
