@@ -142,7 +142,12 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
   const leftovers = templateSamples(model.template).filter((s) => s.length >= 12 && specNorm.includes(normText(s)));
   if (leftovers.length) add("PLACEHOLDER_TEXT", "template", null, [], `The spec still contains sample text from the template: "${leftovers[0].slice(0, 80)}"${leftovers.length > 1 ? ` and ${leftovers.length - 1} more` : ""}.`, "Replaced with this course's own content.");
 
-  return out;
+  // One entry per problem: drop exact repeats (same code, section, refs and description).
+  const seen = new Set<string>();
+  return out.filter((d) => {
+    const key = [d.code, d.location.section, [...d.location.refs].sort().join(","), normText(d.description)].join("|");
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
 }
 
 export type Check = { id: string; rule: string; pass: boolean; detail: string };
