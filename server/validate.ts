@@ -88,13 +88,17 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
   const ptype = /laborator|\blab\b|practical/i.test(spec.course_type), pcred = Number(model.ltp.split(":")[2]) > 0;
   if (ptype !== pcred) add("WRONG_TEMPLATE", "template", 2, [], `Course type "${spec.course_type}" and credit structure ${model.ltp} disagree on whether the course has a lab.`, `Chose the ${model.template === "integrated" ? "Integrated" : "Non-Lab"} template.`);
 
-  // Section 8: lab courses must list the laboratory for practical skills.
-  if (model.template === "integrated") {
-    const practical = model.skills.find((s) => /practical/i.test(s.skill));
-    if (practical && !/lab/i.test(practical.how)) {
-      add("OTHER", "spec", 8, [], `"${practical.skill}" is imparted only through "${practical.how}", but this is a lab course.`, "Added Laboratory to how practical skills are imparted.");
-      practical.how = practical.how && practical.how !== "--" ? `${practical.how}, Laboratory` : "Laboratory";
-    }
+  // Section 4: a lab line that names its unit ("Lab Exercises on <title>") must use the unit's own title.
+  for (const u of spec.units) {
+    const named = u.lab?.match(/^\s*lab(?:oratory)?\s+exercises?\s+on\s+(.+?)\.?\s*$/i)?.[1];
+    if (!named) continue;
+    const a = normText(named), b = normText(u.title);
+    const words = (x: string) => x.toLowerCase().split(/\W+/).filter(Boolean);
+    const shared = words(named).filter((w) => words(u.title).includes(w)).length;
+    if (a === b || a.startsWith(b) || shared < 2) continue;
+    add("LABEL_OR_TITLE_MISMATCH", "spec", 4, [`Unit-${u.number}`], `The lab exercises of Unit ${u.number} are labelled "${named}", but the unit is titled "${u.title}".`, `Labelled them with the unit title "${u.title}".`);
+    const fixed = model.units.find((m) => m.number === u.number);
+    if (fixed?.lab) fixed.lab = fixed.lab.replace(named, u.title);
   }
 
   // Summary vs syllabus (AI judgement on the original summary).

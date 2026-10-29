@@ -147,7 +147,7 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
   const units = unitsSrc.map((u, i) => {
     const number = u.number || i + 1;
     const specUnit = spec.units.find((s) => s.number === number) ?? spec.units[i];
-    return { number, title: u.title, content: u.content, hours: u.hours ?? specUnit?.hours ?? null, lab: specUnit?.lab ?? null };
+    return { number, title: u.title, content: u.content, hours: u.hours ?? specUnit?.hours ?? null, lab: specUnit?.lab?.replace(/^\s*lab(?:oratory)?\s+exercises?\s*:\s*/i, "") || null };
   });
 
   // Assessment: drop CO rows that are not defined, split group weightage across its columns by marks.
