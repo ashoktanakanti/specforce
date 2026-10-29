@@ -103,7 +103,8 @@ export function teachingHours(m: SpecModel) {
     lectures: sumOf(/lecture/i),
     lab: sumOf(/practical|laborator(y|ies)$|^lab/i),
     tests_exams: sumOf(/test|exam|mid ?term/i),
-    total: m.teaching.groups.reduce((a, g) => a + g.hours, 0),
+    // Contact hours: every teaching activity except tests and exams (which are listed separately).
+    total: m.teaching.groups.filter((g) => !/test|exam|mid ?term/i.test(g.name)).reduce((a, g) => a + g.hours, 0),
   };
 }
 
