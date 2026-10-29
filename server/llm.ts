@@ -60,7 +60,7 @@ async function callProvider(prompt: string, cfg: LlmConfig): Promise<string> {
   return j?.choices?.[0]?.message?.content ?? "";
 }
 
-export async function generateJson<T>(prompt: string, schema: ZodType<T>, cfg: LlmConfig): Promise<T> {
+export async function generateJson<T>(prompt: string, schema: ZodType<T, any, any>, cfg: LlmConfig): Promise<T> {
   let last = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const suffix = attempt === 0 ? "" : `\n\nYour previous answer was invalid: ${last}. Reply with valid JSON only.`;
