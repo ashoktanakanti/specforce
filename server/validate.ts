@@ -82,7 +82,7 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
   // Section 2 states total interaction hours; the teaching table must agree with it.
   const interaction = spec.credits.find((c) => /interaction/i.test(c.label));
   const interactionHours = interaction ? Number(String(interaction.value).replace(/[^\d.]/g, "")) : 0;
-  if (interactionHours && sum && interactionHours !== sum) add("HOURS_INCONSISTENT", "spec", 2, [], `Total Hours of Interaction is ${interactionHours} in the credits table, but teaching and learning hours add up to ${sum}.`, "Reported for correction; teaching hours are kept as listed.");
+  if (interactionHours && sum && interactionHours !== sum) add("HOURS_INCONSISTENT", "spec", 6, [], `Total Hours of Interaction is ${interactionHours} in the credits table, but teaching and learning hours add up to ${sum}.`, "Reported for correction; teaching hours are kept as listed.");
 
   // Template choice and signals.
   const ptype = /laborator|\blab\b|practical/i.test(spec.course_type), pcred = Number(model.ltp.split(":")[2]) > 0;
@@ -127,7 +127,7 @@ export function runChecks(m: SpecModel): Check[] {
   const html = renderHtml(m, { watermark: false });
   const left = templateSamples(m.template).filter((s) => s.length >= 8 && html.includes(s));
   const badCeil = allCells.filter((c) => c.level > bloomCeiling(c.col, m.cos.find((x) => x.id === c.co)?.bloom ?? 6));
-  const badPractical = allCells.filter((c) => (c.col === "PO-3" || c.col === "PO-5") && c.level >= 2 && !(m.assessment.coverage[c.co] ?? []).some(isPracticalOrAssignment));
+  const badPractical = allCells.filter((c) => c.col === "PO-5" && c.level >= 2 && !(m.assessment.coverage[c.co] ?? []).some(isPracticalOrAssignment));
   const extraIds = [...Object.keys(m.map), ...covIds].filter((k) => !ids.includes(k));
   return [
     { id: "V1", rule: "CO count is the same in Sections 3, 5 and 7", pass: mapIds.length === ids.length && ids.every((i) => covIds.includes(i)), detail: `${ids.length} COs; ${mapIds.length} map rows; ${ids.filter((i) => covIds.includes(i)).length} assessed rows` },
@@ -138,7 +138,7 @@ export function runChecks(m: SpecModel): Check[] {
     { id: "V6", rule: "Assessment weightages total 100%", pass: Math.abs(weight - 100) < 0.5, detail: `${Math.round(weight * 100) / 100}%` },
     { id: "V7", rule: "No template sample text remains", pass: left.length === 0, detail: left.slice(0, 3).join(" | ") || "clean" },
     { id: "V8", rule: `PSO columns match the programme (${PSO_IDS.join(", ")})`, pass: allCells.every((c) => !c.col.startsWith("PSO") || PSO_IDS.includes(c.col)), detail: PSO_IDS.join(", ") },
-    { id: "V9", rule: "Map values are 1-3, within Bloom's ceiling, strong PO-3/PO-5 assessed practically", pass: !badCeil.length && !badPractical.length && allCells.every((c) => [1, 2, 3].includes(c.level)), detail: [...badCeil, ...badPractical].map((c) => `${c.co} ${c.col}`).join(", ") || "ok" },
+    { id: "V9", rule: "Map values are 1-3, within Bloom's ceiling, strong PO-5 assessed practically", pass: !badCeil.length && !badPractical.length && allCells.every((c) => [1, 2, 3].includes(c.level)), detail: [...badCeil, ...badPractical].map((c) => `${c.co} ${c.col}`).join(", ") || "ok" },
     { id: "V10", rule: "Template matches the credit/course-type rule or has an override reason", pass: m.template === m.templateDetected || !!m.templateOverrideReason.trim(), detail: m.template === m.templateDetected ? m.templateSignals.join("; ") : `Override: ${m.templateOverrideReason || "(no reason)"}` },
   ];
 }

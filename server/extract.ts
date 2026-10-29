@@ -9,9 +9,23 @@ import { ApiError } from "./envelope.js";
 function htmlToText(html: string): string {
   const $ = cheerio.load(html);
   $("script, style").remove();
+  // Lay each table out as a grid: a short merged header is repeated over every column it covers, and a cell that
+  // spans rows leaves a blank below it, so values line up with the header above them.
   $("table").each((_, t) => {
-    const rows = $(t).find("tr").map((_, tr) =>
-      "| " + $(tr).find("th, td").map((_, c) => $(c).text().replace(/\s+/g, " ").trim()).get().join(" | ") + " |").get();
+    const left: number[] = []; // rows each column is still covered by a rowspan from an earlier row
+    const rows = $(t).find("tr").map((_, tr) => {
+      const out: string[] = [];
+      let col = 0;
+      const skipCovered = () => { while (left[col] > 0) { out.push(""); left[col]--; col++; } };
+      $(tr).find("th, td").each((_, c) => {
+        skipCovered();
+        const text = $(c).text().replace(/\s+/g, " ").trim();
+        const span = Math.max(1, Number($(c).attr("colspan")) || 1), rows = Math.max(1, Number($(c).attr("rowspan")) || 1);
+        for (let k = 0; k < span; k++) { out.push(k === 0 || text.length <= 40 ? text : ""); if (rows > 1) left[col] = rows - 1; col++; }
+      });
+      skipCovered();
+      return "| " + out.join(" | ") + " |";
+    }).get();
     $(t).replaceWith(`\n${rows.join("\n")}\n`);
   });
   $("br").replaceWith("\n");

@@ -31,7 +31,7 @@ This saves `outputs/specforge_output.json` and `outputs/spec.html` and checks th
 | Structure | `server/pipeline.ts` | AI turns the spec and blueprint into JSON, validated with Zod |
 | Merge | `server/pipeline.ts` | Blueprint decides COs and units; everything else from the spec. Template picked from L:T:P / course type |
 | Bloom's level | `server/model.ts` | Looked up in code from the CO's first verb (`config/po_pso.json`) |
-| Map | `server/pipeline.ts` | AI proposes cells with reasons; code then enforces Bloom's ceilings, the PO-3/PO-5 assessment rule and PSO columns |
+| Map | `server/pipeline.ts` | Starts from the spec's existing map and corrects it (AI maps new COs and writes reasons); code enforces Bloom's ceilings, PO-5 tool use, PO-6 to PO-10 evidence and PSO columns |
 | Defects | `server/validate.ts` | Plain-code rules: CO tables, PSO columns, old map vs Bloom's, hours, weightages, marks, extra sections, leftover sample text, lab skills |
 | Document | `server/render.ts` | Fills `templates/*.html` with cheerio; DRAFT watermark until approved |
 | Workflow | `server/store.ts` | Draft → Submitted → Under Review → Pending HOD → Approved (+ Returned). Every permission checked on the server (403) |

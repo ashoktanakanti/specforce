@@ -53,6 +53,7 @@ const MapSchema = z.object({
 });
 
 const SPEC_PROMPT = (text: string) => `You read a university course specification and return its content as JSON. Copy text exactly as written (do not fix it), except where told.
+Tables are given as "| a | b |" rows; a merged header cell is repeated over every column it covers, so a sub-column belongs to the header directly above it.
 Return this JSON shape:
 {
  "title","code","course_type","department","faculty": strings from the header table,
@@ -99,9 +100,10 @@ Mapping rules (follow strictly, then re-check every cell against them before ans
 - A CO cannot map more strongly than its Bloom's level supports: L1-L2 outcomes (remember/explain) map to PO-3 and PO-4 at most 1; L3 (apply) at most 2; strong design (PO-3 = 3) needs a Create or Evaluate-level outcome.
 - PO-5 needs real tool use (lab work or programming) for that CO.
 - PO-6, PO-7, PO-8, PO-9 and PO-10 need explicit evidence in the syllabus or assessment (e.g. teamwork, presentations, ethics, project management). No evidence means leave them out.
-- A CO mapped 2 or 3 to PO-3 or PO-5 must be assessed in a practical or assignment component (see coverage).
+- A CO mapped 2 or 3 to PO-5 must be assessed in a practical or assignment component (see coverage).
 - PSOs: rate how directly the CO builds the PSO.
 - Each filled cell has a one-line justification that cites the CO's verb and the syllabus or assessment evidence.
+- "existing_map" is the course team's current map. Correct it rather than replace it: keep each existing value unless it breaks a rule above (then lower it to the highest level the rule allows, or leave it out when there is no evidence), and do not add new cells to an existing row. For a CO with no existing row, map it in the same style and strength as the existing rows of COs at a similar Bloom's level.
 
 Also:
 - "summary": rewrite the course summary (one paragraph, 70-120 words, same formal tone) so it covers the theme of every unit, starting from the original summary.
@@ -111,6 +113,7 @@ Also:
 Return JSON: {"summary","summary_matches_syllabus","summary_missing_themes":[],"cos":[{"id","plain","example"}],"map":[{"co":"CO-1","cells":[{"col":"PO-1","level":3,"why":"..."}]}]}`;
 
 const normCo = (id: string) => { const n = id.match(/\d+/)?.[0]; return n ? `CO-${Number(n)}` : id.trim(); };
+const normCol = (s: string) => s.toUpperCase().replace(/\s/g, "").replace(/^(PSO|PO)-?(\d+)$/, "$1-$2");
 const normLtp = (s: string) => { const d = s.match(/\d+/g); return d && d.length >= 3 ? d.slice(0, 3).map(Number).join(":") : "0:0:0"; };
 
 export function detectTemplate(ltp: string, courseType: string): { template: Template; signals: string[] } {
@@ -177,6 +180,20 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
     defects: [],
   };
 
+  // The spec's existing map, for COs whose outcome is unchanged (same Bloom's level), limited to the programme's columns.
+  const oldRows: Record<string, Record<string, number>> = {};
+  for (const r of spec.old_map.rows) {
+    const id = normCo(r.co), co = cos.find((c) => c.id === id);
+    const specCo = spec.cos.find((c) => c.id === id);
+    if (!co || !specCo || (bloomFromVerb(specCo.statement) ?? 3) !== co.bloom) continue;
+    const row: Record<string, number> = {};
+    for (const [rawCol, v] of Object.entries(r.values)) {
+      const col = normCol(rawCol), level = Math.round(Number(v));
+      if (MAP_COLUMNS.includes(col) && level >= 1 && level <= 3) row[col] = level;
+    }
+    if (Object.keys(row).length) oldRows[id] = row;
+  }
+
   // CO-PO-PSO map, simpler CO wording and the revised summary.
   const mapped = await ai(MAP_PROMPT({
     course: model.header.title, credits_ltp: ltp, has_lab: template === "integrated",
@@ -185,6 +202,7 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
     units: units.map((u) => ({ number: u.number, title: u.title, content: u.content, lab: u.lab })),
     assessment_components: columns.map((c) => c.name),
     skills_table: spec.skills,
+    existing_map: oldRows,
   }), MapSchema);
 
   if (mapped.summary) model.summary = mapped.summary;
@@ -195,13 +213,20 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
   for (const c of cos) {
     const row: Record<string, Cell> = {};
     const aiRow = mapped.map.find((r) => normCo(r.co) === c.id);
-    for (const cell of aiRow?.cells ?? []) {
-      const col = cell.col.toUpperCase().replace(/\s/g, "").replace(/^(PSO|PO)-?(\d+)$/, "$1-$2");
+    const aiCells = new Map((aiRow?.cells ?? []).map((cell) => [normCol(cell.col), cell]));
+    const old = oldRows[c.id];
+    // Existing row: keep the course team's values, corrected by the rules. PO-6 to PO-10 stay only when the AI found evidence.
+    // New row: the AI's values, checked by the same rules.
+    const proposed: [string, number][] = old
+      ? Object.entries(old).filter(([col]) => !/^PO-(6|7|8|9|10)$/.test(col) || aiCells.has(col))
+      : [...aiCells].map(([col, cell]) => [col, cell.level]);
+    for (const [col, raw] of proposed) {
       if (!MAP_COLUMNS.includes(col)) continue;
-      let level = Math.max(0, Math.min(3, Math.round(cell.level)));
+      let level = Math.max(0, Math.min(3, Math.round(raw)));
       level = Math.min(level, bloomCeiling(col, c.bloom));
-      if ((col === "PO-3" || col === "PO-5") && level >= 2 && !(coverage[c.id] ?? []).some(isPracticalOrAssignment)) level = 1;
-      if (level >= 1) row[col] = { level: level as 1 | 2 | 3, justification: cell.why || `${c.id} supports ${col}.` };
+      if (col === "PO-5" && !(coverage[c.id] ?? []).some(isPracticalOrAssignment) && !units.some((u) => u.lab)) level = 0;
+      if (col === "PO-5" && level >= 2 && !(coverage[c.id] ?? []).some(isPracticalOrAssignment)) level = 1;
+      if (level >= 1) row[col] = { level: level as 1 | 2 | 3, justification: aiCells.get(col)?.why || `${c.id} (${REF.blooms.find((b) => b.level === `L${c.bloom}`)?.name ?? "Bloom's L" + c.bloom}) contributes to ${col} through the course's syllabus and assessment.` };
     }
     if (!PO_IDS.some((p) => row[p])) row["PO-1"] = { level: 1, justification: `${c.id} draws on the engineering and computing fundamentals of the course.` };
     model.map[c.id] = row;
