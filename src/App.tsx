@@ -26,7 +26,7 @@ export default function App() {
       <header className="top">
         <button className="brand" onClick={() => setCurrent(null)}>
           <span className="mark" aria-hidden>§</span>
-          <span><b>SpecForge</b><small>course specs, corrected</small></span>
+          <span><b>SpecForge</b><small>course outcomes, made clear</small></span>
         </button>
         <div className="roles" role="radiogroup" aria-label="Acting as">
           {ROLES.map((r) => (
@@ -39,8 +39,8 @@ export default function App() {
 
       <div className="body">
         <aside className="rail">
-          <p className="eyebrow">Specs</p>
-          {specs.length === 0 && <p className="muted small">Nothing yet. Generate your first spec.</p>}
+          <p className="eyebrow">Courses</p>
+          {specs.length === 0 && <p className="muted small">Nothing yet. Upload your first course.</p>}
           {specs.map((s) => (
             <button key={s.id} className={`specitem ${current?.id === s.id ? "on" : ""}`} onClick={() => open(s.id)}>
               <span className="code">{s.code || "—"}</span>
@@ -48,7 +48,7 @@ export default function App() {
               <span className={`status s-${s.status.replace(/\s/g, "")}`}>{s.status}</span>
             </button>
           ))}
-          {current && role === "Author" && <button className="ghost new" onClick={() => setCurrent(null)}>+ New spec</button>}
+          {current && role === "Author" && <button className="ghost new" onClick={() => setCurrent(null)}>+ New course</button>}
         </aside>
 
         <main className="main">

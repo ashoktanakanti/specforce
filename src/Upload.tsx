@@ -54,9 +54,9 @@ export default function Upload({ role, onDone, openSettings }: { role: Role; onD
 
   return (
     <section className="hero">
-      <p className="eyebrow">New course specification</p>
-      <h1>Hand over the messy spec.<br /><em>Get back one that adds up.</em></h1>
-      <p className="lede">SpecForge reads the existing course spec and the question-paper blueprint, rebuilds it in the official template, re-derives the CO–PO–PSO map with a reason for every cell, and explains each outcome in plain words.</p>
+      <p className="eyebrow">New course</p>
+      <h1>Upload your course details.<br /><em>Get back a clean, correct version.</em></h1>
+      <p className="lede">Drop in the course document (title, credits, Course Outcomes, units, hours, assessment) and the question-paper blueprint. SpecForge fixes what's wrong, rebuilds the CO–PO–PSO map with a reason for every cell, and explains each Course Outcome (CO) in plain words.</p>
 
       {role !== "Author" ? (
         <div className="note">You are acting as <b>{role}</b>. Only the Author uploads files. Pick a spec on the left to review it, or switch to Author.</div>
@@ -68,19 +68,19 @@ export default function Upload({ role, onDone, openSettings }: { role: Role; onD
       ) : (
         <>
           <div className="drops">
-            <Drop label="Existing course spec" hint="Drop the current spec here, or click to choose" file={spec} onFile={setSpec} required />
-            <Drop label="Question-paper blueprint" hint="Drop the blueprint: it decides the COs and units" file={bp} onFile={setBp} />
+            <Drop label="Course details document" hint="The current course document (outcomes, units, hours…). Drop it here or click" file={spec} onFile={setSpec} required />
+            <Drop label="Question-paper blueprint" hint="The exam blueprint: it decides the final COs and units" file={bp} onFile={setBp} />
           </div>
           <div className="go">
             {!hasKey && <p className="warn">Add your Gemini or OpenRouter key first. <button className="link" onClick={openSettings}>Open AI settings</button></p>}
-            <button className="primary" disabled={!spec || !hasKey} onClick={go}>Forge the spec →</button>
+            <button className="primary" disabled={!spec || !hasKey} onClick={go}>Fix my course →</button>
           </div>
         </>
       )}
       {err && <p className="bad" role="alert">{err}</p>}
 
       <div className="how">
-        <div><b>1</b><p>Blueprint decides the outcomes and units. Everything else comes from the existing spec.</p></div>
+        <div><b>1</b><p>Blueprint decides the outcomes and units. Everything else comes from the course document.</p></div>
         <div><b>2</b><p>The map is rebuilt from each outcome's Bloom's level, never copied.</p></div>
         <div><b>3</b><p>Author edits, Reviewer comments, HOD approves. Then the DRAFT stamp comes off.</p></div>
       </div>
