@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { call, loadSettings, type Role } from "./api";
+import { call, loadSettings } from "./api";
 import type { SpecView } from "./types";
 
 const STEPS = ["Reading your files", "Pulling out outcomes, units and tables", "Mapping outcomes to POs and PSOs", "Checking for problems"];
@@ -26,7 +26,7 @@ function Drop({ label, hint, file, onFile, required }: { label: string; hint: st
   );
 }
 
-export default function Upload({ role, onDone, openSettings }: { role: Role; onDone: (v: SpecView) => void; openSettings: () => void }) {
+export default function Upload({ onDone, openSettings }: { onDone: (v: SpecView) => void; openSettings: () => void }) {
   const [spec, setSpec] = useState<File | null>(null);
   const [bp, setBp] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,9 +58,7 @@ export default function Upload({ role, onDone, openSettings }: { role: Role; onD
       <h1>Upload your course details.<br /><em>Get back a clean, correct version.</em></h1>
       <p className="lede">Drop in the course document (title, credits, Course Outcomes, units, hours, assessment) and the question-paper blueprint. SpecForge fixes what's wrong, rebuilds the CO–PO–PSO map with a reason for every cell, and explains each Course Outcome (CO) in plain words.</p>
 
-      {role !== "Author" ? (
-        <div className="note">You are acting as <b>{role}</b>. Only the Author uploads files. Pick a spec on the left to review it, or switch to Author.</div>
-      ) : busy ? (
+      {busy ? (
         <ol className="progress" aria-live="polite">
           {STEPS.map((s, i) => <li key={s} className={i < step ? "done" : i === step ? "now" : ""}>{s}</li>)}
           <li className="muted small">This takes about a minute with a free model.</li>
@@ -82,7 +80,7 @@ export default function Upload({ role, onDone, openSettings }: { role: Role; onD
       <div className="how">
         <div><b>1</b><p>Blueprint decides the outcomes and units. Everything else comes from the course document.</p></div>
         <div><b>2</b><p>The map is rebuilt from each outcome's Bloom's level, never copied.</p></div>
-        <div><b>3</b><p>Author edits, Reviewer comments, HOD approves. Then the DRAFT stamp comes off.</p></div>
+        <div><b>3</b><p>Every Course Outcome is rewritten in plain words, with an example of what you will actually do.</p></div>
       </div>
     </section>
   );
