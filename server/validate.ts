@@ -2,7 +2,7 @@
 // output file); runChecks() is the V1-V10 validation report on the CORRECTED spec.
 import { MAP_COLUMNS, PSO_IDS, bloomCeiling, isPracticalOrAssignment, teachingHours, type Defect, type SpecModel } from "./model.js";
 import type { BlueprintDoc, SpecDoc } from "./pipeline.js";
-import { renderHtml, templateSamples } from "./render.js";
+import { renderHtml, templateHeadings, templateSamples } from "./render.js";
 
 const normCo = (id: string) => { const n = id.match(/\d+/)?.[0]; return n ? `CO-${Number(n)}` : id.trim(); };
 const normText = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -104,8 +104,16 @@ export function findDefects(x: { spec: SpecDoc; bp: BlueprintDoc | null; model: 
   // Summary vs syllabus (AI judgement on the original summary).
   if (!x.summaryOk) add("SUMMARY_SYLLABUS_MISMATCH", "spec", 1, [], `The course summary does not cover: ${x.missingThemes.join("; ") || "some unit themes"}.`, "Rewrote the summary to cover every unit.");
 
-  // Typos and broken references the AI corrected while reading.
-  for (const t of spec.typos) if (t.original && t.corrected && t.original !== t.corrected)
+  // Section headings written differently from the template (e.g. wrong capitalisation).
+  const specLines = x.specText.split("\n").map((l) => l.trim()).filter(Boolean);
+  templateHeadings(model.template).forEach((h, i) => {
+    const line = specLines.find((l) => normText(l) === normText(h));
+    if (line && line !== h) add("TYPO_OR_FORMAT", "spec", i + 1, [], `Section heading "${line}" should read "${h}".`, `Used the template heading "${h}".`);
+  });
+
+  // Typos and broken references the AI corrected while reading (skipping any already reported above).
+  const reported = (o: string) => out.some((d) => d.code === "TYPO_OR_FORMAT" && normText(d.description).includes(normText(o)));
+  for (const t of spec.typos) if (t.original && t.corrected && t.original !== t.corrected && !reported(t.original))
     add("TYPO_OR_FORMAT", "spec", t.section && t.section <= 12 ? t.section : 9, [], `"${t.original}" should read "${t.corrected}".`, `Corrected to "${t.corrected}".`);
 
   // Sections that the template has no place for.

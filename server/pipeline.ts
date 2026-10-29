@@ -68,7 +68,7 @@ Return this JSON shape:
  "skills": [{"skill","how"}] rows of the Achieving COs table,
  "resources": [{"heading","items"}] the resource lists in order (Essential Reading, Recommended Reading, Magazines and Journals, Websites, Other Electronic Resources); in items, rejoin entries broken across lines, correct obvious typos in author names, publisher names and URLs, and strip stray list numbering,
  "extra_sections": [{"heading","number"}] any top-level section that is NOT one of: Course Summary, Course Size and Credits, Course Outcomes, Course Contents, Course Map, Teaching and Learning Methods, Assessment and Reassessment, Achieving COs, Course Resources. number is its position counting the nine above as 1-9 (so the next one is 10),
- "typos": [{"section","original","corrected"}] every spelling mistake or broken reference/URL you corrected in resources or found elsewhere, with the section number (1-9) where it is. Only real errors.
+ "typos": [{"section","original","corrected"}] every spelling mistake or broken reference/URL you corrected in resources or found elsewhere, with the section number (1-9) where it is. Only real errors in the words themselves: do not report list numbering, line breaks or spacing that you cleaned up.
 }
 
 DOCUMENT:
@@ -114,6 +114,13 @@ Return JSON: {"summary","summary_matches_syllabus","summary_missing_themes":[],"
 
 const normCo = (id: string) => { const n = id.match(/\d+/)?.[0]; return n ? `CO-${Number(n)}` : id.trim(); };
 const normCol = (s: string) => s.toUpperCase().replace(/\s/g, "").replace(/^(PSO|PO)-?(\d+)$/, "$1-$2");
+const EVIDENCE: Record<string, RegExp> = {
+  "PO-6": /societ|environment|sustainab|public health|safety|legal/i,
+  "PO-7": /ethic|human values|professional (practice|responsibilit)/i,
+  "PO-8": /team|group (work|project|activit)|collaborat/i,
+  "PO-9": /communicat|report writing|technical report|presentation|documentation/i,
+  "PO-10": /project management|management principles|finance|economic|costing/i,
+};
 const normLtp = (s: string) => { const d = s.match(/\d+/g); return d && d.length >= 3 ? d.slice(0, 3).map(Number).join(":") : "0:0:0"; };
 
 export function detectTemplate(ltp: string, courseType: string): { template: Template; signals: string[] } {
@@ -210,6 +217,11 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
     const p = mapped.cos.find((x) => normCo(x.id) === c.id);
     c.plain = p?.plain ?? ""; c.example = p?.example ?? "";
   }
+  // PO-6 to PO-10 need explicit evidence: words for them in the units, labs, assessment components or teaching activities that have hours.
+  const evidenceText = [
+    ...units.flatMap((u) => [u.content, u.lab ?? ""]), ...columns.map((c) => c.name),
+    ...spec.teaching.groups.flatMap((g) => [...(g.hours > 0 ? [g.name] : []), ...g.items.filter((i) => i.hours > 0).map((i) => i.name)]),
+  ].join(" ");
   for (const c of cos) {
     const row: Record<string, Cell> = {};
     const aiRow = mapped.map.find((r) => normCo(r.co) === c.id);
@@ -217,9 +229,8 @@ export async function runPipeline(files: { spec: UploadedFile; blueprint?: Uploa
     const old = oldRows[c.id];
     // Existing row: keep the course team's values, corrected by the rules. PO-6 to PO-10 stay only when the AI found evidence.
     // New row: the AI's values, checked by the same rules.
-    const proposed: [string, number][] = old
-      ? Object.entries(old).filter(([col]) => !/^PO-(6|7|8|9|10)$/.test(col) || aiCells.has(col))
-      : [...aiCells].map(([col, cell]) => [col, cell.level]);
+    const proposed: [string, number][] = (old ? Object.entries(old) : [...aiCells].map(([col, cell]): [string, number] => [col, cell.level]))
+      .filter(([col]) => !EVIDENCE[col] || EVIDENCE[col].test(evidenceText));
     for (const [col, raw] of proposed) {
       if (!MAP_COLUMNS.includes(col)) continue;
       let level = Math.max(0, Math.min(3, Math.round(raw)));

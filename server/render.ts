@@ -11,6 +11,11 @@ const load = (t: Template) => (cache[t] ??= readFileSync(join(process.cwd(), "te
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // The sample course text inside a template, collected when the template loads (used by validation rule V7).
+// The numbered section headings of a template, e.g. "Achieving COs", without number or trailing colon.
+export function templateHeadings(t: Template): string[] {
+  return [...load(t).matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => m[1].replace(/<[^>]+>/g, "").replace(/^\s*\d+\.\s*/, "").replace(/:\s*$/, "").trim());
+}
+
 export function templateSamples(t: Template): string[] {
   const $ = cheerio.load(load(t));
   const out = new Set<string>();
