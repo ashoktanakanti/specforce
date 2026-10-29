@@ -10,7 +10,7 @@ export type LlmConfig = { provider: Provider; key: string; model: string };
 
 export const DEFAULT_MODELS = { gemini: "gemini-3.8-flash", openrouter: "google/gemini-2.5-flash", anthropic: "claude-sonnet-5-5" } as const;
 
-// If the default Gemini model is unavailable to this key, these are tried next (only when no model was chosen).
+// Tried in order when a Gemini model is missing for this key or overloaded.
 const GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
 
 export function configFromRequest(req: Request): LlmConfig {
@@ -22,6 +22,8 @@ export function configFromRequest(req: Request): LlmConfig {
   return { provider, key, model: model || DEFAULT_MODELS[provider] };
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 function stripFences(text: string): string {
   return text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 }
@@ -29,25 +31,28 @@ function stripFences(text: string): string {
 async function callProvider(prompt: string, cfg: LlmConfig): Promise<string> {
   if (cfg.provider === "gemini") {
     const ai = new GoogleGenAI({ apiKey: cfg.key });
-    const models = cfg.model === DEFAULT_MODELS.gemini ? [cfg.model, ...GEMINI_FALLBACKS] : [cfg.model];
-    for (const [i, model] of models.entries()) {
-    try {
-      const r = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: "application/json" } });
-      if (model !== cfg.model) cfg.model = model; // remember the one that worked for the rest of this request
-      return r.text ?? "";
-    } catch (e: any) {
-      const status = Number(e?.status ?? e?.code ?? 0);
-      if (status === 404 && i < models.length - 1) continue;
-      // Show the provider's own reason (with the key scrubbed out) so a wrong model or key is easy to spot.
-      const why = String(e?.message ?? "").split(cfg.key).join("***").replace(/\s+/g, " ").slice(0, 300);
-      console.error(`Gemini error ${status || ""}: ${why}`);
-      if (status === 429) throw new ApiError(429, "RATE_LIMITED", "The AI provider says too many requests. Wait a minute or switch model.");
-      if (status === 404) throw new ApiError(400, "BAD_MODEL", `Gemini has no model "${cfg.model}". Copy an exact Flash model id from AI Studio into Settings.`);
-      if (status === 400 || status === 401 || status === 403) throw new ApiError(401, "BAD_KEY", `Gemini rejected the key or model: ${why}`);
-      throw new ApiError(502, "PROVIDER_ERROR", `The AI provider failed: ${why || "no details"}`);
+    // The chosen model first, then the other Flash models: used when a model is missing or overloaded ("high demand").
+    const models = [...new Set([cfg.model, DEFAULT_MODELS.gemini, ...GEMINI_FALLBACKS])];
+    for (const model of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: "application/json" } });
+          cfg.model = model; // keep using the model that worked for the rest of this request
+          return r.text ?? "";
+        } catch (e: any) {
+          const status = Number(e?.status ?? e?.code ?? 0);
+          // The provider's own reason, with the key scrubbed out, so a wrong model or key is easy to spot.
+          const why = String(e?.message ?? "").split(cfg.key).join("***").replace(/\s+/g, " ").slice(0, 300);
+          console.error(`Gemini ${model} error ${status || ""}: ${why}`);
+          const busy = [429, 500, 503, 504].includes(status) || /overloaded|high demand|unavailable|exhausted/i.test(why);
+          if (status === 404) break; // model not offered: try the next one
+          if (busy) { if (attempt === 0) { await sleep(4000); continue; } break; } // wait once, then try the next model
+          if (status === 400 || status === 401 || status === 403) throw new ApiError(401, "BAD_KEY", `Gemini rejected the key or model: ${why}`);
+          throw new ApiError(502, "PROVIDER_ERROR", `The AI provider failed: ${why || "no details"}`);
+        }
+      }
     }
-    }
-    throw new ApiError(400, "BAD_MODEL", "No Gemini model was available. Set a model in Settings.");
+    throw new ApiError(503, "AI_BUSY", "Gemini is overloaded on every Flash model right now. Wait a minute and try again, or switch provider in Settings.");
   }
   if (cfg.provider === "anthropic") {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
