@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { call } from "./api";
-import type { Reference, SpecView } from "./types";
+import { call, type Role } from "./api";
+import type { Reference, SpecView, Status } from "./types";
 
+const FLOW: Status[] = ["Draft", "Submitted", "Under Review", "Pending HOD", "Approved"];
 const BLOOM = ["", "Remember", "Understand", "Apply", "Analyse", "Evaluate", "Create"];
-type Tab = "outcomes" | "map" | "issues" | "document";
+const SECTIONS = ["General", "1. Course Summary", "2. Course Size and Credits", "3. Course Outcomes", "4. Course Contents", "5. CO-PO-PSO Map", "6. Teaching and Learning", "7. Assessment", "8. Achieving COs", "9. Course Resources"];
+type Tab = "outcomes" | "map" | "issues" | "document" | "review";
 
 function download(name: string, text: string, type: string) {
   const a = document.createElement("a");
@@ -23,15 +25,17 @@ function reportHtml(s: SpecView) {
 <h2>Problems found in the inputs (${s.defects.length})</h2><table><tr><th>Severity</th><th>Code</th><th>Where</th><th>Problem</th><th>Fix applied</th></tr>${rows}</table>`;
 }
 
-export default function SpecPage({ spec, onChange }: { spec: SpecView; onChange: (v: SpecView) => void }) {
+export default function SpecPage({ spec, role, onChange }: { spec: SpecView; role: Role; onChange: (v: SpecView) => void }) {
   const [tab, setTab] = useState<Tab>("outcomes");
   const [ref, setRef] = useState<Reference | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [comment, setComment] = useState("");
+  const [section, setSection] = useState(SECTIONS[0]);
   const [picked, setPicked] = useState<{ co: string; col: string } | null>(null);
   const [summary, setSummary] = useState(spec.model.summary);
   const m = spec.model;
-  const canEdit = spec.status === "Draft" || spec.status === "Returned";
+  const canEdit = role === "Author" && (spec.status === "Draft" || spec.status === "Returned");
   const cols = ref ? [...ref.pos.map((p) => p.id), ...ref.psos.map((p) => p.id)] : [];
 
   useEffect(() => { call<Reference>("/reference").then(setRef).catch(() => {}); }, []);
@@ -43,6 +47,10 @@ export default function SpecPage({ spec, onChange }: { spec: SpecView; onChange:
     catch (e) { setErr((e as Error).message); return false; }
     finally { setBusy(false); }
   }
+  const act = (action: string, needComment = false) => {
+    if (needComment && !comment.trim()) { setErr("Write a comment saying what needs fixing, then return it."); setTab("review"); return; }
+    run("/transition", { action, comment }).then((ok) => ok && setComment(""));
+  };
   const setCell = (co: string, col: string, level: 1 | 2 | 3 | null) => run("", { map: { [co]: { [col]: level } } }, "PATCH");
   const overrideTemplate = () => {
     const next = m.template === "integrated" ? "non_lab" : "integrated";
@@ -53,6 +61,7 @@ export default function SpecPage({ spec, onChange }: { spec: SpecView; onChange:
 
   const sev = (s: string) => spec.defects.filter((d) => d.severity === s).length;
   const passed = spec.checks.filter((c) => c.pass).length;
+  const stepIdx = FLOW.indexOf(spec.status);
   const cell = picked ? m.map[picked.co]?.[picked.col] : undefined;
   const colInfo = picked && ref ? ref.pos.find((p) => p.id === picked.col) ?? ref.psos.find((p) => p.id === picked.col) : undefined;
 
@@ -78,10 +87,27 @@ export default function SpecPage({ spec, onChange }: { spec: SpecView; onChange:
         </div>
       </header>
 
+      <ol className="flow" aria-label="Workflow status">
+        {FLOW.map((s, i) => <li key={s} className={i < stepIdx || spec.status === "Approved" ? "done" : i === stepIdx ? "now" : ""}>{s}</li>)}
+        {spec.status === "Returned" && <li className="returned">Returned to Author</li>}
+      </ol>
+
+      <div className="actions">
+        <span className="muted small">Acting as <b>{role}</b></span>
+        {role === "Author" && (spec.status === "Draft" || spec.status === "Returned") && <button className="primary" disabled={busy} onClick={() => act("submit")}>{spec.status === "Returned" ? "Resubmit to Reviewer" : "Submit to Reviewer"}</button>}
+        {role === "Reviewer" && spec.status === "Submitted" && <button disabled={busy} onClick={() => act("start_review")}>Start review</button>}
+        {role === "Reviewer" && (spec.status === "Submitted" || spec.status === "Under Review") && <>
+          <button className="primary" disabled={busy} onClick={() => act("forward")}>Forward to HOD</button>
+          <button className="ghost" disabled={busy} onClick={() => act("return", true)}>Return with comment</button></>}
+        {role === "HOD" && spec.status === "Pending HOD" && <>
+          <button className="primary" disabled={busy} onClick={() => act("approve")}>Approve</button>
+          <button className="ghost" disabled={busy} onClick={() => act("return", true)}>Return with remarks</button></>}
+        {spec.status === "Approved" && <span className="approved">✓ Approved, DRAFT watermark removed</span>}
+      </div>
       {err && <p className="bad" role="alert">{err}</p>}
 
       <nav className="tabs" role="tablist">
-        {([["outcomes", "Outcomes, simply"], ["map", "CO–PO–PSO map"], ["issues", `Issues · ${spec.defects.length}`], ["document", "Document"]] as [Tab, string][]).map(([k, l]) =>
+        {([["outcomes", "Outcomes, simply"], ["map", "CO–PO–PSO map"], ["issues", `Issues · ${spec.defects.length}`], ["document", "Document"], ["review", `Review · ${spec.comments.length}`]] as [Tab, string][]).map(([k, l]) =>
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
       </nav>
 
@@ -175,6 +201,26 @@ export default function SpecPage({ spec, onChange }: { spec: SpecView; onChange:
         </section>
       )}
 
+      {tab === "review" && (
+        <section className="review">
+          {spec.status !== "Approved" && (
+            <div className="compose">
+              <select value={section} onChange={(e) => setSection(e.target.value)} aria-label="Section">{SECTIONS.map((s) => <option key={s}>{s}</option>)}</select>
+              <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={3} placeholder={role === "Author" ? "Reply to a comment…" : "What should the Author change?"} />
+              <button disabled={busy || !comment.trim()} onClick={() => run("/comments", { section, text: comment }).then((ok) => ok && setComment(""))}>Add comment</button>
+            </div>
+          )}
+          <ul className="thread">
+            {spec.comments.map((c) => <li key={c.id}><p className="eyebrow">{c.section} · {c.role} · {new Date(c.at).toLocaleString()}</p><p>{c.text}</p></li>)}
+            {spec.comments.length === 0 && <li className="muted">No comments yet.</li>}
+          </ul>
+          <p className="eyebrow">History</p>
+          <table className="log">
+            <thead><tr><th>When</th><th>Who</th><th>Role</th><th>Change</th><th>Comment</th></tr></thead>
+            <tbody>{[...spec.log].reverse().map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleString()}</td><td>{l.user}</td><td>{l.role}</td><td>{l.action === "edit" ? "edited" : `${l.from ?? "—"} → ${l.to}`}</td><td>{l.comment}</td></tr>)}</tbody>
+          </table>
+        </section>
+      )}
     </article>
   );
 }
