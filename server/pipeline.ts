@@ -106,7 +106,7 @@ Mapping rules (follow strictly, then re-check every cell against them before ans
 - "existing_map" is the course team's current map. Correct it rather than replace it: keep each existing value unless it breaks a rule above (then lower it to the highest level the rule allows, or leave it out when there is no evidence), and do not add new cells to an existing row. For a CO with no existing row, map it in the same style and strength as the existing rows of COs at a similar Bloom's level.
 
 Also:
-- "summary": rewrite the course summary (one paragraph, 70-120 words, same formal tone) so it covers the theme of every unit, starting from the original summary.
+- "summary": rewrite the course summary (one paragraph, 80-130 words, same formal tone), starting from the original summary. It must name the main topic of EVERY unit in order, using that unit's own key terms (its title words and its main listed topics), plus the lab work for a lab course.
 - "summary_matches_syllabus": false if the ORIGINAL summary leaves out the main theme of one or more units; list them in "summary_missing_themes".
 - "cos": for each CO, "plain": the outcome rewritten in simple everyday English a first-year student instantly understands (one sentence, no jargon, start with "You will"), and "example": one concrete thing the student will actually do (one short sentence).
 
