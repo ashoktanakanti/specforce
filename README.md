@@ -1,69 +1,57 @@
-# SpecForge starter
+# SpecForge
 
-Participant portal (sign in, prompts, submit): **https://specforge-arena.vercel.app**
+Upload a messy course specification (and its question-paper blueprint). SpecForge rebuilds it in the official
+template, re-derives the CO-PO-PSO map with a one-line reason for every cell, lists every problem it found in the
+inputs, and explains each Course Outcome in plain English so a student (or a new faculty member) gets it at a glance.
+Author edits, Reviewer comments, HOD approves; the DRAFT watermark comes off only after approval.
 
-Level 0 is already built: a React app and an Express server that run together, plus a Settings panel where you paste your own AI key.
-
-## Start (5 minutes)
+## Run it
 
 ```bash
 npm install
-npm run dev
+npm run dev          # web on http://localhost:5173, API on http://localhost:3001
 ```
 
-Open http://localhost:5173. Press **Settings**, choose Gemini or OpenRouter, paste your key, press **Test key**. If it says the key works, you are ready for Level 1.
+Open the app, press **AI key**, pick Gemini or OpenRouter, paste your key, press **Test key**. Then drop the spec
+(and blueprint) and press **Forge the spec**. Switch roles (Author / Reviewer / HOD) in the header.
 
-Don't have a key yet? Ask at the help desk. It is free.
-
-## Where things are
-
-| Folder | What it is |
-| --- | --- |
-| `kit/` | Handbook, one-page guidelines, primer cards and the prompt pack (`specforge-prompt.json`, every level prompt). |
-| `sample-inputs/` | A sample course spec, a blueprint and the PO/PSO reference. Practice here. |
-| `templates/` | The two HTML layouts your export must use. |
-| `config/` | `po_pso.json` (POs, PSOs, Bloom's levels) and `specforge_output.schema.json` (the format of your output file). |
-| `src/`, `server/` | Your app. |
-| `outputs/` | Where your exported `specforge_output.json` goes. |
-
-## Working with your AI assistant
-
-This repo has an `AGENTS.md` (also copied as `CLAUDE.md`, `GEMINI.md` and a Cursor rule). Your assistant reads it first. Paste each level's prompt from the handbook, in order.
-
-## Before you submit
-
-With the app running (`npm run dev`), in a second terminal:
+Scoring check (app running, second terminal):
 
 ```bash
-npm run verify -- gemini YOUR_KEY
+npm run verify -- gemini YOUR_KEY        # or: openrouter YOUR_KEY [model]
 ```
 
-This sends the sample files to your app's `POST /api/v1/generate`, exactly as the organisers will, saves
-`outputs/specforge_output.json` and `outputs/spec.html`, and checks the output file. Upload both files on the portal,
-or zip the whole project (with `outputs/` inside) and upload just the zip.
+This saves `outputs/specforge_output.json` and `outputs/spec.html` and checks the file format.
 
-Your final score comes from the organisers running your code: your last commit before 15:45, or your latest zip if that is
-newer. So `npm install` + `npm start` must work on a fresh copy of your project. Don't commit your key.
+## How it works
 
-## Handing in a zip instead of a repo
+| Step | Where | How |
+| --- | --- | --- |
+| Read files | `server/extract.ts` | mammoth (.docx), word-extractor (.doc), pdf-parse (.pdf), cheerio (.html); tables kept as rows |
+| Structure | `server/pipeline.ts` | AI turns the spec and blueprint into JSON, validated with Zod |
+| Merge | `server/pipeline.ts` | Blueprint decides COs and units; everything else from the spec. Template picked from L:T:P / course type |
+| Bloom's level | `server/model.ts` | Looked up in code from the CO's first verb (`config/po_pso.json`) |
+| Map | `server/pipeline.ts` | AI proposes cells with reasons; code then enforces Bloom's ceilings, the PO-3/PO-5 assessment rule and PSO columns |
+| Defects | `server/validate.ts` | Plain-code rules: CO tables, PSO columns, old map vs Bloom's, hours, weightages, marks, extra sections, leftover sample text, lab skills |
+| Document | `server/render.ts` | Fills `templates/*.html` with cheerio; DRAFT watermark until approved |
+| Workflow | `server/store.ts` | Draft → Submitted → Under Review → Pending HOD → Approved (+ Returned). Every permission checked on the server (403) |
 
-No GitHub repo, or it won't push? Upload a `.zip` of your project in **Submit**. If it has `outputs/` inside, the zip alone
-is a full submission: both files are read from it.
+API (all under `/api/v1`): `POST /generate` (scorer), `POST /specs`, `GET /specs`, `GET /specs/:id`,
+`PATCH /specs/:id` (Author only, Draft/Returned), `POST /specs/:id/transition`, `POST /specs/:id/comments`,
+`GET /specs/:id/spec.html`. Role is sent in the `x-role` header (seeded users, no login).
 
-| Put in the zip | Leave out |
-| --- | --- |
-| `package.json`, `package-lock.json` | `node_modules/` (the organisers install packages; it makes the zip too big) |
-| `server/`, `src/`, `scripts/`, `config/`, `templates/` | `.env` (holds your API key; a zip with one is refused) |
-| `index.html`, `tsconfig.json`, `vite.config.ts`, `README.md` | `.git/`, `dist/` |
-| `outputs/specforge_output.json`, `outputs/spec.html` (scored) | `kit/`, `sample-inputs/` (optional) |
+## Deploy on Vercel
 
-- **Windows:** open the project folder, select everything except `node_modules` and `.env`, right-click, **Send to**,
-  **Compressed (zipped) folder**.
-- **Mac:** select the same files in Finder, right-click, **Compress**.
-- **Terminal** (Mac, Linux, Git Bash), in the project folder:
+Import the repo in Vercel; `vercel.json` builds the Vite app and serves the Express API from `api/index.ts`.
+No environment variables are needed: users paste their own key in the app. Specs are kept in memory, so on
+serverless they can disappear between requests; run locally for the full review workflow demo.
 
-```bash
-zip -r specforge.zip . -x "node_modules/*" ".git/*" "dist/*" ".env*"
-```
+## AI tools used
 
-Up to 4 MB (this starter zips to about 0.3 MB). Each new zip replaces the last one; zips can be uploaded until 15:45.
+- Claude (Anthropic) for writing the code
+- Stitch (Google) for UI design exploration
+- Gemini / OpenRouter models at runtime (bring your own key)
+
+Track: coder track (own editor with AI help).
+
+Keys are never stored on the server, logged, or committed.

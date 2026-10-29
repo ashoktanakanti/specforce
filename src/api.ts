@@ -19,9 +19,15 @@ export async function call<T>(path: string, init: RequestInit = {}): Promise<T> 
   const s = loadSettings();
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (init.body && !(init.body instanceof FormData)) headers["Content-Type"] = "application/json";
+  headers["x-role"] = getRole();
   if (s.key) { headers["x-llm-provider"] = s.provider; headers["x-llm-key"] = s.key; headers["x-llm-model"] = s.model || DEFAULT_MODELS[s.provider]; }
   const res = await fetch(`/api/v1${path}`, { ...init, headers });
   const json = await res.json().catch(() => null);
   if (!json?.success) throw new Error(json?.error?.message ?? `Request failed (${res.status})`);
   return json.data as T;
 }
+
+export type Role = "Author" | "Reviewer" | "HOD";
+const ROLE_STORE = "specforge.role";
+export function getRole(): Role { try { return (localStorage.getItem(ROLE_STORE) as Role) || "Author"; } catch { return "Author"; } }
+export function setRole(r: Role) { try { localStorage.setItem(ROLE_STORE, r); } catch { /* ignore */ } }
