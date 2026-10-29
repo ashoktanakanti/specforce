@@ -8,7 +8,10 @@ import { ApiError } from "./envelope.js";
 export type Provider = "gemini" | "openrouter" | "anthropic";
 export type LlmConfig = { provider: Provider; key: string; model: string };
 
-export const DEFAULT_MODELS = { gemini: "gemini-2.5-flash", openrouter: "google/gemini-2.5-flash", anthropic: "claude-sonnet-5-5" } as const;
+export const DEFAULT_MODELS = { gemini: "gemini-3.8-flash", openrouter: "google/gemini-2.5-flash", anthropic: "claude-sonnet-5-5" } as const;
+
+// If the default Gemini model is unavailable to this key, these are tried next (only when no model was chosen).
+const GEMINI_FALLBACKS = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
 
 export function configFromRequest(req: Request): LlmConfig {
   const provider = String(req.header("x-llm-provider") ?? "").toLowerCase();
@@ -25,12 +28,16 @@ function stripFences(text: string): string {
 
 async function callProvider(prompt: string, cfg: LlmConfig): Promise<string> {
   if (cfg.provider === "gemini") {
+    const ai = new GoogleGenAI({ apiKey: cfg.key });
+    const models = cfg.model === DEFAULT_MODELS.gemini ? [cfg.model, ...GEMINI_FALLBACKS] : [cfg.model];
+    for (const [i, model] of models.entries()) {
     try {
-      const ai = new GoogleGenAI({ apiKey: cfg.key });
-      const r = await ai.models.generateContent({ model: cfg.model, contents: prompt, config: { responseMimeType: "application/json" } });
+      const r = await ai.models.generateContent({ model, contents: prompt, config: { responseMimeType: "application/json" } });
+      if (model !== cfg.model) cfg.model = model; // remember the one that worked for the rest of this request
       return r.text ?? "";
     } catch (e: any) {
       const status = Number(e?.status ?? e?.code ?? 0);
+      if (status === 404 && i < models.length - 1) continue;
       // Show the provider's own reason (with the key scrubbed out) so a wrong model or key is easy to spot.
       const why = String(e?.message ?? "").split(cfg.key).join("***").replace(/\s+/g, " ").slice(0, 300);
       console.error(`Gemini error ${status || ""}: ${why}`);
@@ -39,6 +46,8 @@ async function callProvider(prompt: string, cfg: LlmConfig): Promise<string> {
       if (status === 400 || status === 401 || status === 403) throw new ApiError(401, "BAD_KEY", `Gemini rejected the key or model: ${why}`);
       throw new ApiError(502, "PROVIDER_ERROR", `The AI provider failed: ${why || "no details"}`);
     }
+    }
+    throw new ApiError(400, "BAD_MODEL", "No Gemini model was available. Set a model in Settings.");
   }
   if (cfg.provider === "anthropic") {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
