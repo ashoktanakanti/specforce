@@ -79,7 +79,7 @@ export default function SpecPage({ spec, role, onChange }: { spec: SpecView; rol
             {!m.hasBlueprint && <span className="chip warnchip">no blueprint supplied</span>}
           </p>
         </div>
-        <div className="exports">
+        <div className="exports" data-guide="exports"><span className="muted small">Exports</span>
           <button className="ghost" onClick={() => download("spec.html", spec.html, "text/html")}>spec.html</button>
           <button className="ghost" onClick={() => { const w = window.open("", "_blank"); if (w) { w.document.write(spec.html); w.document.close(); setTimeout(() => w.print(), 400); } }}>PDF</button>
           <button className="ghost" onClick={() => download("specforge_output.json", JSON.stringify(spec.output, null, 2), "application/json")}>output.json</button>
@@ -87,13 +87,16 @@ export default function SpecPage({ spec, role, onChange }: { spec: SpecView; rol
         </div>
       </header>
 
-      <ol className="flow" aria-label="Workflow status">
-        {FLOW.map((s, i) => <li key={s} className={i < stepIdx || spec.status === "Approved" ? "done" : i === stepIdx ? "now" : ""}>{s}</li>)}
-        {spec.status === "Returned" && <li className="returned">Returned to Author</li>}
+      <p className="eyebrow">Approval lifecycle</p>
+      <ol className="flow" aria-label="Workflow status" data-guide="flow">
+        {FLOW.map((s, i) => {
+          const state = spec.status === "Approved" || i < stepIdx ? "done" : i === stepIdx ? "now" : spec.status === "Returned" && i === 0 ? "now" : "";
+          return <li key={s} className={state}><b>{i + 1}. {s}</b><small>{state === "done" ? "✓ done" : state === "now" ? (spec.status === "Returned" ? "returned, fix & resubmit" : "current") : "upcoming"}</small></li>;
+        })}
       </ol>
 
-      <div className="actions">
-        <span className="muted small">Acting as <b>{role}</b></span>
+      <div className="actions" data-guide="actions">
+        <span className="viewing"><span aria-hidden>✎</span> Showing the <b>{role}</b> view{spec.status === "Returned" && role === "Author" ? " · the Reviewer/HOD sent this back, see Review" : ""}</span>
         {role === "Author" && (spec.status === "Draft" || spec.status === "Returned") && <button className="primary" disabled={busy} onClick={() => act("submit")}>{spec.status === "Returned" ? "Resubmit to Reviewer" : "Submit to Reviewer"}</button>}
         {role === "Reviewer" && spec.status === "Submitted" && <button disabled={busy} onClick={() => act("start_review")}>Start review</button>}
         {role === "Reviewer" && (spec.status === "Submitted" || spec.status === "Under Review") && <>
@@ -108,7 +111,7 @@ export default function SpecPage({ spec, role, onChange }: { spec: SpecView; rol
 
       <nav className="tabs" role="tablist">
         {([["outcomes", "Outcomes, simply"], ["map", "CO–PO–PSO map"], ["issues", `Issues · ${spec.defects.length}`], ["document", "Document"], ["review", `Review · ${spec.comments.length}`]] as [Tab, string][]).map(([k, l]) =>
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
+          <button key={k} data-guide={`tab-${k}`} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
       </nav>
 
       {tab === "outcomes" && (
